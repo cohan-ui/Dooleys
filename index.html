@@ -950,25 +950,32 @@ $("#enqForm").addEventListener("submit", ev => {
   const TRIGGER = XF + LEAD; // begin handoff when this many seconds remain
   let active = a, idle = b;
   let armed = false;         // guard so we only trigger one handoff per cycle
+  let started = false;       // stays false until the hero is revealed — holds frame 0
 
-  a.classList.add("show");
+  a.classList.add("show");   // show the first frame (poster, then decoded frame 0) while we wait
 
-  const start = v => { const p = v.play(); if (p && p.catch) p.catch(()=>{}); };
+  const play = v => { const p = v.play(); if (p && p.catch) p.catch(()=>{}); };
 
-  // Kick off once enough data is buffered
-  const begin = () => { start(a); };
-  if (a.readyState >= 2) begin();
-  else a.addEventListener("canplay", begin, {once:true});
+  // Begin playback from the very first frame. Called once, when the preloader lifts,
+  // so the day→night opening is never consumed behind the loader.
+  function begin(){
+    if (started) return;
+    started = true;
+    try { a.currentTime = 0; } catch(e){}
+    play(a);
+  }
+  addEventListener("hero:start", begin);   // dispatched by the preloader on reveal
+  setTimeout(begin, 6000);                 // failsafe if that event never arrives
 
   function tick(){
     const v = active;
-    if (v.duration && !armed){
+    if (started && v.duration && !armed){
       const remaining = v.duration - v.currentTime;
       if (remaining <= TRIGGER){
         armed = true;
         // prime the idle copy at frame 0, fade it in as the active fades out
         idle.currentTime = 0;
-        start(idle);
+        play(idle);
         idle.classList.add("show");
         active.classList.remove("show");
         // swap roles; re-arm after the crossfade completes
@@ -984,15 +991,17 @@ $("#enqForm").addEventListener("submit", ev => {
   }
   requestAnimationFrame(tick);
 
-  // Pause work when the hero is off-screen (battery / perf)
+  // Pause work when the hero is off-screen (battery / perf).
+  // Only resumes once playback has actually begun — never auto-starts during the initial hold.
   const io = new IntersectionObserver(es => es.forEach(e => {
-    if (e.isIntersecting){ start(active); }
+    if (!started) return;
+    if (e.isIntersecting){ play(active); }
     else { try { a.pause(); b.pause(); } catch(err){} }
   }), {threshold:0.01});
   io.observe($(".hero"));
 })();
 
-/* --- preloader: gated on fonts, brief --------------------------- */
+/* --- preloader: gated on fonts + hero video's first frame -------- */
 (() => {
   const pre = $("#pre"), START = performance.now(), MIN = REDUCE ? 0 : 900;
   document.documentElement.classList.add("is-locked");
@@ -1004,10 +1013,21 @@ $("#enqForm").addEventListener("submit", ev => {
     measure();
     $("#heroTitle").classList.add("in");
     $$(".hero [data-reveal]").forEach(el => el.classList.add("in"));
+    dispatchEvent(new Event("hero:start"));   // release the held video, playing from frame 0
   };
-  Promise.all([document.fonts ? document.fonts.ready : Promise.resolve()])
+
+  // Wait for the hero video's first frame to decode, so we hold on the true opening
+  // frame (not a blank) until reveal. Skipped under reduced-motion (no video playback).
+  const hv = $("#heroVidA");
+  const vidReady = (!REDUCE && hv) ? new Promise(res => {
+    if (hv.readyState >= 2) return res();
+    hv.addEventListener("loadeddata", res, {once:true});
+    hv.addEventListener("error", res, {once:true});   // don't hang if the video fails
+  }) : Promise.resolve();
+
+  Promise.all([document.fonts ? document.fonts.ready : Promise.resolve(), vidReady])
     .then(() => setTimeout(finish, Math.max(0, MIN - (performance.now()-START)) + 250));
-  setTimeout(finish, 4000);
+  setTimeout(finish, 6000);   // hard failsafe (raised to allow the video a moment to buffer)
 })();
 })();
 </script>
