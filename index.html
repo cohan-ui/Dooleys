@@ -945,7 +945,9 @@ $("#enqForm").addEventListener("submit", ev => {
     if (s && s.dataset.src){ s.src = s.dataset.src; v.load(); }
   });
 
-  const XF = 0.85;            // crossfade duration (s), matches CSS transition
+  const XF   = 0.85;         // crossfade (dissolve) duration in seconds — matches CSS transition
+  const LEAD = 1.0;          // start the dissolve this much earlier, to skip the end-of-clip wobble/slowdown
+  const TRIGGER = XF + LEAD; // begin handoff when this many seconds remain
   let active = a, idle = b;
   let armed = false;         // guard so we only trigger one handoff per cycle
 
@@ -962,7 +964,7 @@ $("#enqForm").addEventListener("submit", ev => {
     const v = active;
     if (v.duration && !armed){
       const remaining = v.duration - v.currentTime;
-      if (remaining <= XF){
+      if (remaining <= TRIGGER){
         armed = true;
         // prime the idle copy at frame 0, fade it in as the active fades out
         idle.currentTime = 0;
