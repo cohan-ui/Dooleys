@@ -240,6 +240,14 @@ body.open .burger i:last-child{transform:translateY(-3.5px) rotate(-45deg)}
   .events__row2{grid-template-columns:1fr;max-width:560px}
 }
 @media(min-width:640px) and (max-width:1100px){.events__row2{grid-template-columns:repeat(2,1fr);max-width:none}}
+@media(max-width:640px){
+  /* Weddings: drop the overlapping caption and stack like the coloured cards */
+  .ev-main{display:flex;flex-direction:column;background:var(--bg)}
+  .ev-main .media{position:relative;height:auto;aspect-ratio:16/10}
+  .ev-caption{position:static;width:100%;padding:26px 22px 30px}
+  .ev-caption p{max-width:none}
+  .events__row2{max-width:none}
+}
 
 /* ============ SPACES (dark) ============ */
 .spaces{background:var(--dark);color:var(--cream)}
