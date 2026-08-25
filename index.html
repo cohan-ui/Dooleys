@@ -143,10 +143,10 @@ body.open .burger i:last-child{transform:translateY(-3.5px) rotate(-45deg)}
 .hero{position:relative;overflow:hidden;background:var(--ink);color:#fff;
   min-height:clamp(560px,51.74vw,745px);display:flex;align-items:stretch}
 .hero__bg{position:absolute;inset:0}
-.hero__vid{position:absolute;inset:0;width:100%;height:100%;object-fit:cover;
+.hero__vid{position:absolute;inset:0;width:100%;height:100%;object-fit:cover;z-index:0;
   opacity:0;transition:opacity .85s linear;will-change:opacity}
 .hero__vid.show{opacity:1}
-.hero__bg::after{content:"";position:absolute;inset:0;background:rgba(0,0,0,.2)}
+.hero__bg::after{content:"";position:absolute;inset:0;z-index:1;background:rgba(0,0,0,.2)}
 .hero__grand{position:absolute;left:-2.8vw;bottom:-4.86vw;z-index:1;pointer-events:none;
   font-family:var(--f-eiko);font-weight:300;font-size:26.48vw;line-height:.8;letter-spacing:.01em;
   color:#fff;opacity:.1;white-space:nowrap;will-change:transform}
