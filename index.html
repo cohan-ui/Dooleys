@@ -146,6 +146,9 @@ body.open .burger i:last-child{transform:translateY(-3.5px) rotate(-45deg)}
 .hero__vid{position:absolute;inset:0;width:100%;height:100%;object-fit:cover;z-index:0;
   opacity:0;transition:opacity .85s linear;will-change:opacity}
 .hero__vid.show{opacity:1}
+.hero__fallback{position:absolute;inset:0;z-index:0;width:100%;height:100%;object-fit:cover;
+  opacity:0;transition:opacity .6s linear}
+.hero__fallback.show{opacity:1}
 .hero__bg::after{content:"";position:absolute;inset:0;z-index:1;background:rgba(0,0,0,.2)}
 .hero__grand{position:absolute;left:-2.8vw;bottom:-4.86vw;z-index:1;pointer-events:none;
   font-family:var(--f-eiko);font-weight:300;font-size:26.48vw;line-height:.8;letter-spacing:.01em;
@@ -483,6 +486,7 @@ body.open .burger i:last-child{transform:translateY(-3.5px) rotate(-45deg)}
     <video class="hero__vid" id="heroVidB" muted playsinline preload="auto" aria-hidden="true">
       <source data-src="assets/hero.mp4" type="video/mp4">
     </video>
+    <img class="hero__fallback" id="heroFallback" data-src="assets/hero-fallback.jpg" alt="" aria-hidden="true">
   </div>
   <div class="hero__grand" data-drift="-0.05" aria-hidden="true">GRAND</div>
   <div class="hero__in">
@@ -951,25 +955,45 @@ $("#enqForm").addEventListener("submit", ev => {
   let active = a, idle = b;
   let armed = false;         // guard so we only trigger one handoff per cycle
   let started = false;       // stays false until the hero is revealed — holds frame 0
+  let failed = false;        // once true, the static fallback frame takes over for good
 
   a.classList.add("show");   // show the first frame (poster, then decoded frame 0) while we wait
 
   const play = v => { const p = v.play(); if (p && p.catch) p.catch(()=>{}); };
 
+  // Static fallback: if the video errors or is too slow to load, drop to a still frame
+  // (the 1s dusk shot) so the hero is never blank or stuck on a half-loaded video.
+  function fallback(){
+    if (failed) return;
+    failed = true;
+    const fb = $("#heroFallback");
+    if (fb){
+      if (fb.dataset.src && !fb.src) fb.src = fb.dataset.src;   // load only when needed
+      fb.classList.add("show");
+    }
+    a.classList.remove("show"); b.classList.remove("show");
+    try { a.pause(); b.pause(); } catch(e){}
+  }
+  [a, b].forEach(v => v.addEventListener("error", fallback, {once:true}));
+  // Too slow: no first frame decoded within the window → use the fallback
+  setTimeout(() => { if (!failed && a.readyState < 2) fallback(); }, 5500);
+
   // Begin playback from the very first frame. Called once, when the preloader lifts,
   // so the day→night opening is never consumed behind the loader.
   function begin(){
-    if (started) return;
+    if (started || failed) return;
     started = true;
     try { a.currentTime = 0; } catch(e){}
     play(a);
+    // Stall guard: if playback hasn't advanced shortly after starting, fall back
+    setTimeout(() => { if (!failed && a.currentTime < 0.1) fallback(); }, 4000);
   }
   addEventListener("hero:start", begin);   // dispatched by the preloader on reveal
   setTimeout(begin, 6000);                 // failsafe if that event never arrives
 
   function tick(){
     const v = active;
-    if (started && v.duration && !armed){
+    if (started && !failed && v.duration && !armed){
       const remaining = v.duration - v.currentTime;
       if (remaining <= TRIGGER){
         armed = true;
@@ -994,7 +1018,7 @@ $("#enqForm").addEventListener("submit", ev => {
   // Pause work when the hero is off-screen (battery / perf).
   // Only resumes once playback has actually begun — never auto-starts during the initial hold.
   const io = new IntersectionObserver(es => es.forEach(e => {
-    if (!started) return;
+    if (!started || failed) return;
     if (e.isIntersecting){ play(active); }
     else { try { a.pause(); b.pause(); } catch(err){} }
   }), {threshold:0.01});
